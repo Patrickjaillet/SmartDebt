@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Monitor Pro v2.6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #6366f1; --primary-dark: #4338ca; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0f172a; transition: background 0.3s; }
+        .theme-bg { background-color: var(--primary-dark); transition: all 0.3s; }
+        .theme-text { color: var(--primary); transition: all 0.3s; }
+        .theme-border { border-color: var(--primary); transition: all 0.3s; }
+        .client-card { background-color: #1e293b; border: 1px solid #334155; }
+        .custom-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+        .tab-active { border-bottom: 3px solid var(--primary); color: var(--primary) !important; opacity: 1 !important; }
+        .item-row:not(:last-child) { border-bottom: 1px solid #334155; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.3s ease-out; }
+        .tab-btn { font-size: 9px; font-weight: 900; text-transform: uppercase; padding-bottom: 8px; flex: 1; transition: all 0.2s; opacity: 0.5; color: #94a3b8; }
+        .color-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
+        .color-dot:active { transform: scale(1.2); }
+        .color-dot.active { border-color: white; transform: scale(1.1); }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen pb-24">
+
+    <header id="main-header" class="theme-bg text-white p-5 sticky top-0 shadow-2xl z-10 rounded-b-3xl">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 class="text-xl font-black tracking-tighter text-white uppercase leading-none">Business Monitor</h1>
+                <div class="mt-2">
+                    <button onclick="exportToCSV()" class="text-[9px] bg-black/20 px-3 py-1 rounded border border-white/30 font-bold uppercase active:bg-black/40">Exporter</button>
+                </div>
+            </div>
+            <div class="text-right">
+                <p id="total-display" class="text-2xl font-black text-white leading-none">0 €</p>
+                <p id="label-display" class="text-[10px] uppercase font-bold opacity-70 mt-1">Total à recouvrer</p>
+            </div>
+        </div>
+        
+        <div class="flex justify-around mt-2">
+            <button id="tab-active" onclick="switchTab('active')" class="tab-btn tab-active">En cours</button>
+            <button id="tab-history" onclick="switchTab('history')" class="tab-btn">Archives</button>
+            <button id="tab-stats" onclick="switchTab('stats')" class="tab-btn">Analyses</button>
+            <button id="tab-about" onclick="switchTab('about')" class="tab-btn">À propos</button>
+        </div>
+    </header>
+
+    <main class="p-4">
+        <div id="list-view" class="space-y-6">
+            <div class="mb-4">
+                <input type="text" id="search-bar" oninput="renderDebts()" placeholder="Rechercher un client..." 
+                       class="w-full p-4 rounded-2xl bg-slate-800 text-white text-sm outline-none border border-slate-700 shadow-inner">
+            </div>
+            <div id="debt-list" class="space-y-6"></div>
+        </div>
+
+        <div id="stats-view" class="hidden animate-slide-up">
+            <div class="bg-slate-800 p-5 rounded-3xl border border-slate-700 custom-shadow mb-6 text-center">
+                <h3 class="text-xs font-black theme-text uppercase mb-4 tracking-widest">Évolution des activités</h3>
+                <div class="grid grid-cols-4 gap-1 mb-6">
+                    <button onclick="updateChart(1)" class="text-[9px] bg-slate-900 p-2 rounded-lg font-bold border border-slate-700">1J</button>
+                    <button onclick="updateChart(7)" class="text-[9px] bg-slate-900 p-2 rounded-lg font-bold border border-slate-700">7J</button>
+                    <button onclick="updateChart(30)" class="text-[9px] bg-slate-900 p-2 rounded-lg font-bold border border-slate-700">1M</button>
+                    <button onclick="updateChart('all')" class="text-[9px] bg-slate-900 p-2 rounded-lg font-bold border border-slate-700 uppercase">Tout</button>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="debtChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="about-view" class="hidden animate-slide-up space-y-4 text-center py-6">
+            <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 custom-shadow inline-block w-full text-left">
+                <div class="flex items-center space-x-4 mb-6">
+                    <div id="app-icon" class="w-16 h-16 theme-bg rounded-2xl flex items-center justify-center text-2xl shadow-lg">📊</div>
+                    <div>
+                        <h2 class="text-xl font-black text-white uppercase tracking-tighter leading-none">Business Monitor</h2>
+                        <p class="theme-text text-[9px] font-black uppercase tracking-widest mt-1">Version 2.6.0</p>
+                    </div>
+                </div>
+
+                <div class="mb-8 p-4 bg-slate-900/50 rounded-2xl border border-slate-700">
+                    <p class="text-slate-500 text-[9px] uppercase font-black mb-3">Thème Visuel</p>
+                    <div class="flex space-x-4">
+                        <div onclick="setTheme('#6366f1', '#4338ca')" class="color-dot bg-[#6366f1]" title="Indigo"></div>
+                        <div onclick="setTheme('#10b981', '#065f46')" class="color-dot bg-[#10b981]" title="Émeraude"></div>
+                        <div onclick="setTheme('#f59e0b', '#b45309')" class="color-dot bg-[#f59e0b]" title="Ambre"></div>
+                        <div onclick="setTheme('#ec4899', '#be185d')" class="color-dot bg-[#ec4899]" title="Rose"></div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 text-sm mb-10">
+                    <div class="flex justify-between border-b border-slate-700 pb-2">
+                        <span class="text-slate-500 text-[9px] uppercase font-black">Créateur</span>
+                        <span class="font-bold">Gemini AI</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-2">
+                        <span class="text-slate-500 text-[9px] uppercase font-black">Support</span>
+                        <span class="font-bold text-slate-300 italic">contact@votre-domaine.com</span>
+                    </div>
+                </div>
+
+                <div class="pt-6 border-t border-red-900/30">
+                    <button onclick="clearAll()" class="w-full bg-red-900/10 text-red-500 border border-red-900/30 py-3 rounded-xl text-[10px] font-black uppercase active:bg-red-900 active:text-white">
+                        Réinitialiser les données
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <button id="fab" onclick="openModal()" class="fixed bottom-6 right-6 theme-bg text-white w-16 h-16 rounded-2xl shadow-2xl text-4xl flex items-center justify-center border border-white/20 active:opacity-80 z-20">
+        +
+    </button>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-30">
+        <div class="bg-slate-800 rounded-t-3xl w-full max-w-md p-6 animate-slide-up border-t border-slate-700">
+            <h2 class="text-xl font-black mb-6 theme-text uppercase">Nouvel article</h2>
+            <div class="space-y-5">
+                <input type="text" id="client-name" placeholder="NOM DU CLIENT" class="w-full bg-slate-900 border-2 border-slate-700 p-3 rounded-xl outline-none focus:theme-border text-white font-bold uppercase">
+                <input type="number" step="0.01" id="debt-amount" placeholder="MONTANT (€)" class="w-full bg-slate-900 border-2 border-slate-700 p-3 rounded-xl outline-none focus:theme-border text-white font-bold text-lg">
+                <input type="text" id="debt-reason" placeholder="MOTIF / ARTICLE" class="w-full bg-slate-900 border-2 border-slate-700 p-3 rounded-xl outline-none focus:theme-border text-white uppercase text-xs">
+                <div class="flex space-x-3 pt-4">
+                    <button onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-bold uppercase text-[10px]">Annuler</button>
+                    <button onclick="saveDebt()" class="flex-[2] theme-bg text-white py-4 rounded-xl font-black uppercase text-[10px]">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let debts = JSON.parse(localStorage.getItem('debts')) || [];
+        let currentTab = 'active';
+        let myChart = null;
+
+        // Gestion du Thème
+        function setTheme(primary, dark) {
+            document.documentElement.style.setProperty('--primary', primary);
+            document.documentElement.style.setProperty('--primary-dark', dark);
+            localStorage.setItem('theme-primary', primary);
+            localStorage.setItem('theme-dark', dark);
+            
+            // Mise à jour visuelle immédiate
+            document.querySelectorAll('.color-dot').forEach(dot => {
+                dot.classList.toggle('active', dot.style.backgroundColor === primary);
+            });
+            if(myChart) updateChart('all');
+        }
+
+        function loadTheme() {
+            const p = localStorage.getItem('theme-primary') || '#6366f1';
+            const d = localStorage.getItem('theme-dark') || '#4338ca';
+            setTheme(p, d);
+        }
+
+        const formatEuro = (num) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
+            document.getElementById(`tab-${tab}`).classList.add('tab-active');
+
+            document.getElementById('list-view').classList.toggle('hidden', tab === 'stats' || tab === 'about');
+            document.getElementById('stats-view').classList.toggle('hidden', tab !== 'stats');
+            document.getElementById('about-view').classList.toggle('hidden', tab !== 'about');
+            document.getElementById('fab').style.display = (tab === 'active') ? 'flex' : 'none';
+
+            if (tab === 'stats') {
+                updateChart('all');
+                document.getElementById('label-display').innerText = 'Volume Global';
+                document.getElementById('total-display').innerText = formatEuro(debts.reduce((s, d) => s + d.amount, 0));
+            } else if (tab === 'about') {
+                document.getElementById('label-display').innerText = 'Statut App';
+                document.getElementById('total-display').innerText = 'ONLINE';
+            } else {
+                document.getElementById('label-display').innerText = (tab === 'active') ? 'À recouvrer' : 'Archivé';
+                renderDebts();
+            }
+        }
+
+        function saveDebt() {
+            const name = document.getElementById('client-name').value.trim().toUpperCase();
+            const amount = parseFloat(document.getElementById('debt-amount').value);
+            const reason = document.getElementById('debt-reason').value.trim().toUpperCase();
+            if (!name || isNaN(amount)) return alert("Champs obligatoires !");
+
+            debts.push({ id: Date.now(), name, amount, reason, date: new Date().toISOString(), status: 'active' });
+            localStorage.setItem('debts', JSON.stringify(debts));
+            renderDebts();
+            closeModal();
+        }
+
+        function updateStatus(id, newStatus) {
+            const i = debts.findIndex(x => x.id === id);
+            debts[i].status = newStatus;
+            localStorage.setItem('debts', JSON.stringify(debts));
+            renderDebts();
+        }
+
+        function renderDebts() {
+            const list = document.getElementById('debt-list');
+            const search = document.getElementById('search-bar').value.toLowerCase();
+            list.innerHTML = '';
+            const targetStatus = (currentTab === 'history') ? 'paid' : 'active';
+            let filtered = debts.filter(d => d.status === targetStatus && d.name.toLowerCase().includes(search));
+
+            const grouped = filtered.reduce((acc, d) => {
+                if (!acc[d.name]) acc[d.name] = { items: [], total: 0 };
+                acc[d.name].items.push(d);
+                acc[d.name].total += d.amount;
+                return acc;
+            }, {});
+
+            document.getElementById('total-display').innerText = formatEuro(Object.values(grouped).reduce((sum, g) => sum + g.total, 0));
+
+            Object.keys(grouped).forEach(clientName => {
+                const group = grouped[clientName];
+                const card = document.createElement('div');
+                card.className = "client-card rounded-3xl overflow-hidden custom-shadow mb-4";
+                card.innerHTML = `
+                    <div class="bg-slate-900/40 p-4 border-b border-slate-700 flex justify-between items-center">
+                        <h2 class="font-black text-white uppercase text-sm">${clientName}</h2>
+                        <span class="theme-bg text-white px-3 py-1 rounded-full text-[10px] font-black">${formatEuro(group.total)}</span>
+                    </div>
+                    <div>${group.items.map(item => `
+                        <div class="item-row p-4 flex justify-between items-center bg-slate-800/20">
+                            <div class="flex-1">
+                                <p class="text-[9px] font-bold theme-text uppercase">${new Date(item.date).toLocaleDateString()}</p>
+                                <p class="text-xs text-slate-300 font-bold">${item.reason || 'SANS NOM'}</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="updateStatus(${item.id}, '${currentTab === 'active' ? 'paid' : 'active'}')" 
+                                        class="p-2 ${currentTab === 'active' ? 'bg-emerald-600' : 'theme-bg'} rounded-lg text-[10px]">
+                                    ${currentTab === 'active' ? '✅' : '🔄'}
+                                </button>
+                                ${currentTab === 'history' ? `<button onclick="deleteDette(${item.id})" class="p-2 bg-red-900/50 rounded-lg text-[10px]">🗑️</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                `;
+                list.appendChild(card);
+            });
+            if(Object.keys(grouped).length === 0) list.innerHTML = `<div class="text-center py-20 text-slate-600 italic">Aucune donnée</div>`;
+        }
+
+        function updateChart(days) {
+            const ctx = document.getElementById('debtChart').getContext('2d');
+            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+            
+            let filteredData = (days === 'all') ? debts : debts.filter(d => (new Date() - new Date(d.date)) / (1000*60*60*24) <= days);
+            const stats = filteredData.reduce((acc, d) => {
+                const dStr = new Date(d.date).toLocaleDateString();
+                acc[dStr] = (acc[dStr] || 0) + d.amount;
+                return acc;
+            }, {});
+
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), borderColor: primaryColor, backgroundColor: primaryColor + '20', fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function openModal() { document.getElementById('modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function deleteDette(id) { if(confirm("Supprimer ?")) { debts = debts.filter(x => x.id !== id); localStorage.setItem('debts', JSON.stringify(debts)); renderDebts(); } }
+        function clearAll() { if(confirm("EFFACER TOUT ?")) { debts = []; localStorage.clear(); renderDebts(); } }
+        function exportToCSV() {
+            let csv = "Nom;Montant;Motif;Date;Statut\n" + debts.map(d => `${d.name};${d.amount};${d.reason};${d.date};${d.status}`).join('\n');
+            window.open(encodeURI("data:text/csv;charset=utf-8," + csv));
+        }
+
+        window.onload = () => { loadTheme(); renderDebts(); };
+    </script>
+</body>
+</html>
